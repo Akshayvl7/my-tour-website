@@ -1,1 +1,75 @@
 
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/my-tour-website:latest
+
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Install Docker if not already installed
+            if ! command -v docker &> /dev/null; then
+              sudo apt-get update
+              sudo apt-get install -y docker.io
+              sudo systemctl enable docker
+              sudo systemctl start docker
+            fi
+
+            # Add user to docker group
+            sudo usermod -aG docker $USER
+
+            # Install Docker Compose v2 if not already installed
+            DOCKER_CONFIG=${DOCKER_CONFIG:-$HOME/.docker}
+            mkdir -p $DOCKER_CONFIG/cli-plugins
+            curl -SL https://github.com/docker/compose/releases/download/v2.23.3/docker-compose-linux-x86_64 -o $DOCKER_CONFIG/cli-plugins/docker-compose
+            chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose
+
+            # Refresh shell in docker group context
+            newgrp docker <<EONG
+              echo "Switched to docker group"
+
+              # Stop and remove existing containers and volumes
+              docker compose -f ~/my-tour-website/docker-compose.yml down -v || true
+
+              # Remove old application directory
+              rm -rf ~/my-tour-website
+
+              # Clone the latest code
+              git clone https://github.com/Akshayvl7/my-tour-website.git ~/my-tour-website
+              cd ~/my-tour-website
+
+              # Pull the latest Docker image
+              docker pull ${{ secrets.DOCKERHUB_USERNAME }}/my-tour-website:latest
+
+              # Start the application using Docker Compose
+              docker compose up -d
+            EONG
