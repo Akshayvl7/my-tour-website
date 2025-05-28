@@ -142,7 +142,7 @@ if(isset($_GET['id']) && $_GET['id'] > 0){
 		})
 
         $('.summernote').summernote({
-		        height: 200,
+		        height: 250,
 		        toolbar: [
 		            [ 'style', [ 'style' ] ],
 		            [ 'font', [ 'bold', 'italic', 'underline', 'strikethrough', 'superscript', 'subscript', 'clear'] ],
