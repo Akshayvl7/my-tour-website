@@ -15,7 +15,7 @@
         <div class="container-fluid">
 			<table class="table table-bordered table-stripped">
 				<colgroup>
-					<col width="5%">
+					<col width="10%">
 					<col width="15%">
 					<col width="20%">
 					<col width="35%">
